@@ -61,7 +61,7 @@ First of all, you must have [Python](https://www.python.org/downloads/). The oth
 
 The second step is configuring the ```dl.cfg```, setting your own AWS credentials (mandatory to read and write into S3).
 
-Now, you can run the ELT process execuing ```etl.py```
+Now, you can run the ELT process executing ```etl.py```
 
 
 
