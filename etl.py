@@ -1,5 +1,6 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import *
+from pyspark.sql.types import *
 from datetime import datetime
 import configparser
 import os
@@ -33,9 +34,24 @@ def process_song_data(spark, input_data, output_data):
     # get filepath to song data file
     global song_data 
     song_data = f"{input_data}/song_data/*/*/*/*.json"
+
+    # defining schema for song data
+    global song_schema
+    song_schema = StructType([
+        StructField("num_songs", IntegerType()),
+        StructField("artist_id", StringType()),
+        StructField("artist_latitude", DoubleType()),
+        StructField("artist_longitude", DoubleType()),
+        StructField("artist_location", StringType()),
+        StructField("artist_name", StringType()),
+        StructField("song_id", StringType()),
+        StructField("title", StringType()),
+        StructField("duration", DoubleType()),
+        StructField("year", IntegerType())
+    ])
     
     # read song data file
-    df = spark.read.json(song_data)
+    df = spark.read.json(song_data, schema=song_schema)
 
     # extract columns to create songs table
     songs_table = df.select(
@@ -44,7 +60,7 @@ def process_song_data(spark, input_data, output_data):
         col("artist_id"), 
         col("year"), 
         col("duration")
-    ).distinct()
+    ).dropDuplicates(["song_id"])
     
     # write songs table to parquet files partitioned by year and artist
     songs_table \
@@ -60,7 +76,7 @@ def process_song_data(spark, input_data, output_data):
         col("artist_location").alias("location"),
         col("artist_latitude").alias("latitude"),
         col("artist_longitude").alias("longitude")
-    ).distinct()
+    ).dropDuplicates(["artist_id"])
     
     # write artists table to parquet files
     artists_table \
@@ -79,11 +95,33 @@ def process_log_data(spark, input_data, output_data):
     # get filepath to log data file
     log_data = f"{input_data}/log_data/*/*/*.json"
 
+    # defining schema for log data
+    log_schema = StructType([
+        StructField("artist", StringType()),
+        StructField("auth", StringType()),
+        StructField("firstName", StringType()),
+        StructField("gender", StringType()),
+        StructField("itemInSession", IntegerType()),
+        StructField("lastName", StringType()),
+        StructField("length", DoubleType()),
+        StructField("level", StringType()),
+        StructField("location", StringType()),
+        StructField("method", StringType()),
+        StructField("page", StringType()),
+        StructField("registration", DoubleType()),
+        StructField("sessionId", IntegerType()),
+        StructField("song", StringType()),
+        StructField("status", IntegerType()),
+        StructField("ts", IntegerType()),
+        StructField("userAgent", StringType()),
+        StructField("userId", StringType())
+    ])
+
     # read log data file
-    df = spark.read.json(log_data)
+    df = spark.read.json(log_data, schema=log_schema)
     
     # filter by actions for song plays
-    log_df = log_df.where('page="NextSong"')
+    log_df = df.where('page="NextSong"')
 
     # extract columns for users table    
     users_table = log_df.select(
@@ -92,7 +130,7 @@ def process_log_data(spark, input_data, output_data):
         col("lastName").alias("last_name"), 
         col("gender"), 
         col("level")
-    ).distinct()
+    ).dropDuplicates(["user_id"])
     
     # write users table to parquet files
     users_table \
@@ -118,7 +156,7 @@ def process_log_data(spark, input_data, output_data):
         .withColumn("month", month("datetime")) \
         .withColumn("year", year("datetime")) \
         .withColumn("weekday", dayofweek("datetime"))
-    ).dropDuplicates()
+    ).dropDuplicates(['start_time'])
     
     # write time table to parquet files partitioned by year and month
     time_table \
@@ -128,7 +166,7 @@ def process_log_data(spark, input_data, output_data):
         .parquet(f"{output_data}/time/time.parquet")
 
     # read in song data to use for songplays table
-    song_df = spark.read.json(song_data)
+    song_df = spark.read.json(song_data, schema=song_schema)
 
     # extract columns from joined song and log datasets to create songplays table 
     song_and_logs = log_df.join(song_df, col("log_df.artist") == col("song_df.artist_name"), "inner")
